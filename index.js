@@ -8,7 +8,7 @@ const port = 5000;
 require('dotenv').config()
 app.use(cors());
 app.use(express.json());
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 app.get('/', (req,res)=>{
     res.send("hello world");
 
@@ -73,6 +73,28 @@ async function run() {
   } catch (error) {
     console.error("Fetch error details:", error);
     res.status(500).json([]);
+  }
+});
+app.delete("/api/requests/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    
+   
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid Request ID format" });
+    }
+
+    const query = { _id: new ObjectId(id) };
+    const result = await requestCollection.deleteOne(query);
+
+    if (result.deletedCount === 1) {
+      res.status(200).json({ success: true, message: "Deleted successfully" });
+    } else {
+      res.status(404).json({ success: false, message: "Request not found" });
+    }
+  } catch (error) {
+    console.error("Delete error details:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
 
