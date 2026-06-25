@@ -1,9 +1,12 @@
 const dns = require('node:dns/promises');
 dns.setServers(["1.1.1.1", "8.8.8.8"])
 const express = require('express');
+const cors = require('cors');
 const app = express();
 const port = 5000;
 require('dotenv').config()
+app.use(cors());
+app.use(express.json());
 const { MongoClient, ServerApiVersion } = require('mongodb');
 app.get('/', (req,res)=>{
     res.send("hello world");
@@ -27,6 +30,15 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
+
+    const database = client.db("bloodlink_new")
+    const requestCollection = database.collection("requests");
+    app.post('/api/requests', async(req,res)=>{
+      const request = req.body;
+      const result = await requestCollection.insertOne(request);
+      res.send(result);
+
+    })
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
