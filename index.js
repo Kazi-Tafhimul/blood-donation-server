@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 const port = 5000;
+
 require('dotenv').config()
 app.use(cors());
 app.use(express.json());
@@ -39,6 +40,42 @@ async function run() {
       res.send(result);
 
     })
+  app.get("/api/requests", async (req, res) => {
+  try {
+    const { email, status } = req.query;
+    let matchQuery = {};
+
+    if (email) {
+      matchQuery.requesterEmail = email;
+    }
+    
+    // Advanced status matching
+    if (status && status !== "all") {
+      if (status === "pending") {
+        // Matches if status is exactly "Pending", "pending", OR if the status field does not exist/is null
+        matchQuery.$or = [
+          { status: { $regex: "^pending$", $options: "i" } },
+          { status: { $exists: false } },
+          { status: null }
+        ];
+      } else if (status === "inprogress") {
+        matchQuery.status = { $regex: "^in\\s*progress$", $options: "i" };
+      } else {
+        matchQuery.status = { $regex: `^${status}$`, $options: "i" };
+      }
+    }
+
+    const requests = await requestCollection
+      .find(matchQuery)
+      .toArray();
+
+    res.status(200).json(requests);
+  } catch (error) {
+    console.error("Fetch error details:", error);
+    res.status(500).json([]);
+  }
+});
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
