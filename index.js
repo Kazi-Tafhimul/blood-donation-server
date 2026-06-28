@@ -97,6 +97,65 @@ app.delete("/api/requests/:id", async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
+app.get("/api/admin/stats", async (req, res) => {
+  try {
+   
+    const totalDonors = await client.db("bloodlink_new").collection("users").countDocuments();
+
+  
+    const totalRequests = await client.db("bloodlink_new").collection("requests").countDocuments();
+
+  
+    let totalFunding = 0;
+    try {
+      const fundingCollection = client.db("bloodlink_new").collection("funding");
+      const fundingData = await fundingCollection.find({}).toArray();
+      totalFunding = fundingData.reduce((sum, doc) => sum + (Number(doc.amount) || 0), 0);
+    } catch (e) {
+      
+      totalFunding = 0; 
+    }
+
+    res.status(200).json({
+      totalDonors,
+      totalRequests,
+      totalFunding
+    });
+  } catch (error) {
+    console.error("Admin stats fetch error:", error);
+    res.status(500).json({ totalDonors: 0, totalRequests: 0, totalFunding: 0 });
+  }
+});
+app.patch("/api/requests/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { status } = req.body;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid Request ID format" });
+    }
+
+    if (!status) {
+      return res.status(400).json({ message: "Status value is required" });
+    }
+
+    const query = { _id: new ObjectId(id) };
+    const updateDoc = {
+      $set: { status: status }
+    };
+
+    const result = await requestCollection.updateOne(query, updateDoc);
+
+    if (result.matchedCount === 1) {
+      res.status(200).json({ success: true, message: "Status updated successfully" });
+    } else {
+      res.status(404).json({ success: false, message: "Request not found" });
+    }
+  } catch (error) {
+    console.error("Update status error details:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
