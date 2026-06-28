@@ -157,6 +157,53 @@ app.patch("/api/requests/:id", async (req, res) => {
   }
 });
 
+app.get("/api/users", async (req, res) => {
+  try {
+    const { status } = req.query;
+    let matchQuery = {};
+
+    if (status && status !== "all") {
+      matchQuery.status = status;
+    }
+
+    
+    const users = await client.db("bloodlink_new").collection("user").find(matchQuery).toArray();
+    res.status(200).json(users);
+  } catch (error) {
+    console.error("Fetch users error:", error);
+    res.status(500).json([]);
+  }
+});
+
+
+app.patch("/api/users/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { status, role } = req.body;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid User ID format" });
+    }
+
+    let updateDoc = { $set: {} };
+    if (status) updateDoc.$set.status = status;
+    if (role) updateDoc.$set.role = role;
+
+    const result = await client.db("bloodlink_new")
+      .collection("user")
+      .updateOne({ _id: new ObjectId(id) }, updateDoc);
+
+    if (result.matchedCount === 1) {
+      res.status(200).json({ success: true, message: "User updated successfully" });
+    } else {
+      res.status(404).json({ success: false, message: "User not found" });
+    }
+  } catch (error) {
+    console.error("Update user error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
