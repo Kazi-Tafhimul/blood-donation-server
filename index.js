@@ -9,6 +9,7 @@ require("dotenv").config();
 app.use(cors());
 app.use(express.json());
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
 app.get("/", (req, res) => {
   res.send("hello world");
 });
@@ -23,6 +24,34 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   },
 });
+const JWKS = createRemoteJWKSet(new URL(`${process.env.CLIENT_URL}/api/auth/jwks`));
+const verifyToken = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+ 
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ msg: "Unauthorized" });
+  }
+  
+  const token = authHeader.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({ msg: "Unauthorized" });
+  }
+  
+  try {
+   
+    const { payload } = await jwtVerify(token, JWKS);
+    
+    req.user = payload;
+    console.log("Successfully Verified JWT Payload:", payload);
+    
+    next();
+  } catch (error) {
+    
+    console.error("JWT Verification Middleware Failed:", error.message);
+    return res.status(401).json({ msg: "Unauthorized" });
+  }
+};
 
 async function run() {
   try {
@@ -31,7 +60,8 @@ async function run() {
     const database = client.db("bloodlink_new");
     const requestCollection = database.collection("requests");
     const fundingCollection = database.collection("fundings");
-    app.post("/api/fundings", async (req, res) => {
+    const userCollection = database.collection("user");
+    app.post("/api/fundings",async (req, res) => {
       try {
         const fundingLog = req.body;
 
@@ -362,6 +392,63 @@ async function run() {
   } catch (error) {
     console.error("Backend donor search database query failure:", error);
     res.status(500).json({ error: "Failed to query donor data records" });
+  }
+});
+app.put("/api/user/update-profile", async (req, res) => {
+  try {
+    const { name, email, avatar, district, upazila, bloodGroup } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "User email is required to update profile." 
+      });
+    }
+
+    const query = { email: email };
+    const updateDoc = {
+      $set: {
+        name,
+        // 🛠️ FIX: Only update the image if avatar is provided from frontend. 
+        // Otherwise, it falls back to an empty string or skips overwriting.
+        image: avatar || "", 
+        district,
+        upazila,
+        bloodGroup,
+      },
+    };
+
+    const result = await userCollection.updateOne(query, updateDoc);
+
+    if (result.matchedCount === 1) {
+      res
+        .status(200)
+        .json({ success: true, message: "Profile updated successfully" });
+    } else {
+      res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+  } catch (error) {
+    console.error("Profile update error details:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
+  }
+});
+
+app.get("/api/user/profile", async (req, res) => {
+  try {
+    const email = req.query.email;
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+    
+    const user = await userCollection.findOne({ email: email });
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json(null);
   }
 });
     // Send a ping to confirm a successful connection
