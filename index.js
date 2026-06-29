@@ -34,6 +34,7 @@ async function run() {
 
     const database = client.db("bloodlink_new")
     const requestCollection = database.collection("requests");
+    const fundingCollection = db.collection("fundings");
     app.post('/api/requests', async(req,res)=>{
       const request = req.body;
       const result = await requestCollection.insertOne(request);
