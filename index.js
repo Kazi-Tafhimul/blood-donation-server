@@ -51,6 +51,16 @@ async function run() {
     res.status(500).json({ success: false, message: "Internal server error saving payment log" });
   }
 });
+app.get("/api/fundings", async (req, res) => {
+  try {
+    
+    const history = await fundingCollection.find().sort({ date: -1 }).toArray();
+    res.status(200).json(history);
+  } catch (error) {
+    console.error("Error fetching funding records:", error);
+    res.status(500).json({ success: false, message: "Failed to load payment history matrix" });
+  }
+});
     app.post('/api/requests', async(req,res)=>{
       const request = req.body;
       const result = await requestCollection.insertOne(request);
