@@ -211,6 +211,21 @@ app.patch("/api/users/:id", async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
+app.get("/api/requests/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid ID format" });
+    }
+    const result = await requestCollection.findOne({ _id: new ObjectId(id) });
+    if (!result) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
