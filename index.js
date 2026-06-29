@@ -35,6 +35,22 @@ async function run() {
     const database = client.db("bloodlink_new")
     const requestCollection = database.collection("requests");
     const fundingCollection = db.collection("fundings");
+    app.post("/api/fundings", async (req, res) => {
+  try {
+    const fundingLog = req.body; 
+    
+    
+    if (!fundingLog.transactionId || !fundingLog.amount) {
+      return res.status(400).json({ success: false, message: "Missing required funding details" });
+    }
+
+    const result = await fundingCollection.insertOne(fundingLog);
+    res.status(201).json({ success: true, insertedId: result.insertedId });
+  } catch (error) {
+    console.error("Error saving funding log:", error);
+    res.status(500).json({ success: false, message: "Internal server error saving payment log" });
+  }
+});
     app.post('/api/requests', async(req,res)=>{
       const request = req.body;
       const result = await requestCollection.insertOne(request);
