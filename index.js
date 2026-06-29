@@ -29,7 +29,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
+    
     await client.connect();
 
     const database = client.db("bloodlink_new")
@@ -40,19 +40,18 @@ async function run() {
       res.send(result);
 
     })
-  app.get("/api/requests", async (req, res) => {
+app.get("/api/requests", async (req, res) => {
   try {
-    const { email, status } = req.query;
+
+    const { email, status, page, limit } = req.query;
     let matchQuery = {};
 
     if (email) {
       matchQuery.requesterEmail = email;
     }
     
-    // Advanced status matching
     if (status && status !== "all") {
       if (status === "pending") {
-        // Matches if status is exactly "Pending", "pending", OR if the status field does not exist/is null
         matchQuery.$or = [
           { status: { $regex: "^pending$", $options: "i" } },
           { status: { $exists: false } },
@@ -65,8 +64,17 @@ async function run() {
       }
     }
 
+    
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 6; 
+    const skipNum = (pageNum - 1) * limitNum;
+
+   
     const requests = await requestCollection
       .find(matchQuery)
+      .sort({ _id: -1 }) 
+      .skip(skipNum)
+      .limit(limitNum)
       .toArray();
 
     res.status(200).json(requests);
