@@ -227,6 +227,36 @@ app.get("/api/requests/:id", async (req, res) => {
   }
 });
 
+app.put("/api/requests/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const updateData = req.body;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid Request ID format" });
+    }
+
+    
+    delete updateData._id;
+
+    const query = { _id: new ObjectId(id) };
+    const updateDoc = {
+      $set: updateData 
+    };
+
+    const result = await requestCollection.updateOne(query, updateDoc);
+
+    if (result.matchedCount === 1) {
+      res.status(200).json({ success: true, message: "Blood request details updated successfully" });
+    } else {
+      res.status(404).json({ success: false, message: "Request not found" });
+    }
+  } catch (error) {
+    console.error("Update form details error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
