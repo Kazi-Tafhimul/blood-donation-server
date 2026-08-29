@@ -701,6 +701,64 @@ async function run() {
         }
       },
     );
+    app.patch(
+  "/admin/users/:id/status",
+  verifyToken,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).json({
+          message: "Invalid user ID",
+        });
+      }
+
+      if (!["active", "blocked"].includes(status)) {
+        return res.status(400).json({
+          message: "Invalid status",
+        });
+      }
+
+      const updatedUser = await userCollection.findOneAndUpdate(
+        {
+          _id: new ObjectId(id),
+        },
+        {
+          $set: {
+            status,
+            updatedAt: new Date(),
+          },
+        },
+        {
+          returnDocument: "after",
+          projection: {
+            password: 0,
+          },
+        },
+      );
+
+      if (!updatedUser) {
+        return res.status(404).json({
+          message: "User not found",
+        });
+      }
+
+      res.status(200).json({
+        message: `User ${status === "blocked" ? "blocked" : "unblocked"} successfully`,
+        user: updatedUser,
+      });
+    } catch (error) {
+      console.error("Update user status failed:", error);
+
+      res.status(500).json({
+        message: "Failed to update user status",
+      });
+    }
+  },
+);
 
     app.get("/", (req, res) => {
       res.send("Blood Donation Server is running!");
