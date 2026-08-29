@@ -609,6 +609,93 @@ async function run() {
         }
       },
     );
+     app.patch(
+      "/profile",
+      verifyToken,
+      async (req, res) => {
+        try {
+          const {
+            name,
+            bloodGroup,
+            district,
+            upazila,
+            image,
+            photo,
+          } = req.body;
+
+          if (!name?.trim()) {
+            return res.status(400).json({
+              message: "Name is required",
+            });
+          }
+
+          if (!bloodGroup) {
+            return res.status(400).json({
+              message: "Blood group is required",
+            });
+          }
+
+          if (!district) {
+            return res.status(400).json({
+              message: "District is required",
+            });
+          }
+
+          if (!upazila) {
+            return res.status(400).json({
+              message: "Upazila is required",
+            });
+          }
+
+          const updateData = {
+            name: name.trim(),
+            bloodGroup,
+            district,
+            upazila,
+            updatedAt: new Date(),
+          };
+
+          // Support either image or photo field
+          if (image !== undefined) {
+            updateData.image = image;
+          } else if (photo !== undefined) {
+            updateData.image = photo;
+          }
+
+          const updatedUser = await userCollection.findOneAndUpdate(
+            {
+              _id: req.user.id,
+            },
+            {
+              $set: updateData,
+            },
+            {
+              returnDocument: "after",
+              projection: {
+                password: 0,
+              },
+            },
+          );
+
+          if (!updatedUser) {
+            return res.status(404).json({
+              message: "User profile not found",
+            });
+          }
+
+          res.status(200).json({
+            message: "Profile updated successfully",
+            user: updatedUser,
+          });
+        } catch (error) {
+          console.error("Update profile failed:", error);
+
+          res.status(500).json({
+            message: "Failed to update profile",
+          });
+        }
+      },
+    );
 
 
     app.get("/", (req, res) => {
