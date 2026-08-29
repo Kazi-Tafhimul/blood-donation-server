@@ -510,6 +510,73 @@ async function run() {
         }
       },
     );
+    app.delete(
+      "/donation-requests/:id",
+      verifyToken,
+      requireRole("donor"),
+      async (req, res) => {
+        try {
+          const { id } = req.params;
+
+          if (!ObjectId.isValid(id)) {
+            return res.status(400).json({
+              message: "Invalid donation request ID",
+            });
+          }
+
+          const existingRequest =
+            await donationRequestCollection.findOne({
+              _id: new ObjectId(id),
+            });
+
+          if (!existingRequest) {
+            return res.status(404).json({
+              message: "Donation request not found",
+            });
+          }
+
+          // Only request owner can delete
+          if (existingRequest.requesterId !== req.user.id) {
+            return res.status(403).json({
+              message: "You can only delete your own donation request",
+            });
+          }
+
+          // Prevent deleting completed/canceled requests
+          if (
+            existingRequest.status === "done" ||
+            existingRequest.status === "canceled"
+          ) {
+            return res.status(400).json({
+              message:
+                "Completed or canceled donation requests cannot be deleted",
+            });
+          }
+
+          const result =
+            await donationRequestCollection.deleteOne({
+              _id: new ObjectId(id),
+              requesterId: req.user.id,
+            });
+
+          if (result.deletedCount === 0) {
+            return res.status(404).json({
+              message: "Donation request not found",
+            });
+          }
+
+          res.status(200).json({
+            message: "Donation request deleted successfully",
+          });
+        } catch (error) {
+          console.error("Delete donation request failed:", error);
+
+          res.status(500).json({
+            message: "Failed to delete donation request",
+          });
+        }
+      },
+    );
 
     app.get("/", (req, res) => {
       res.send("Blood Donation Server is running!");
