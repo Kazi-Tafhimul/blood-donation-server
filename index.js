@@ -1,7 +1,11 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const {
+  MongoClient,
+  ServerApiVersion,
+  ObjectId,
+} = require("mongodb");
 const { createRemoteJWKSet, jwtVerify } = require("jose");
 
 const app = express();
@@ -278,6 +282,29 @@ async function run() {
 
           res.status(500).json({
             message: "Failed to confirm donation",
+          });
+        }
+      },
+    );
+    app.get(
+      "/my-donation-requests",
+      verifyToken,
+      requireRole("donor"),
+      async (req, res) => {
+        try {
+          const donationRequests = await donationRequestCollection
+            .find({
+              requesterId: req.user.id,
+            })
+            .sort({ createdAt: -1 })
+            .toArray();
+
+          res.status(200).json(donationRequests);
+        } catch (error) {
+          console.error("Get my donation requests failed:", error);
+
+          res.status(500).json({
+            message: "Failed to fetch your donation requests",
           });
         }
       },
