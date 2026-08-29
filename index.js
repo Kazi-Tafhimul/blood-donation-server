@@ -28,7 +28,7 @@ const JWKS = createRemoteJWKSet(
 );
 const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  console.log("AUTH HEADER:", authHeader);
+  // console.log("AUTH HEADER:", authHeader);
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({
@@ -611,7 +611,7 @@ async function run() {
         }
       },
     );
-    console.log("PROFILE ROUTE REGISTERED");
+    // console.log("PROFILE ROUTE REGISTERED");
     app.get("/profile", verifyToken, async (req, res) => {
       try {
         const user = await userCollection.findOne(
