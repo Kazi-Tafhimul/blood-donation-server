@@ -80,16 +80,106 @@ async function run() {
     await client.connect();
     const db = client.db("blood-donation-db");
     const userCollection = db.collection("users");
+    const donationRequestCollection = db.collection("donationRequests");
 
     await client.db("admin").command({ ping: 1 });
 
     console.log("MongoDB connected successfully!");
-  
+    app.post(
+      "/donation-requests",
+      verifyToken,
+      requireRole("donor"),
+      async (req, res) => {
+        try {
+          const {
+            recipientName,
+            bloodGroup,
+            district,
+            upazila,
+            hospitalName,
+            fullAddress,
+            donationDate,
+            donationTime,
+            requestMessage,
+          } = req.body;
+
+          if (
+            !recipientName ||
+            !bloodGroup ||
+            !district ||
+            !upazila ||
+            !hospitalName ||
+            !fullAddress ||
+            !donationDate ||
+            !donationTime ||
+            !requestMessage
+          ) {
+            return res.status(400).json({
+              message: "All fields are required",
+            });
+          }
+
+          const donationRequest = {
+            requesterId: req.user.id,
+            requesterName: req.user.name,
+            requesterEmail: req.user.email,
+
+            recipientName,
+            bloodGroup,
+            district,
+            upazila,
+            hospitalName,
+            fullAddress,
+            donationDate,
+            donationTime,
+            requestMessage,
+
+            status: "pending",
+
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+
+          const result =
+            await donationRequestCollection.insertOne(donationRequest);
+
+          res.status(201).json({
+            message: "Donation request created successfully",
+            insertedId: result.insertedId,
+          });
+        } catch (error) {
+          console.error("Create donation request failed:", error);
+
+          res.status(500).json({
+            message: "Failed to create donation request",
+          });
+        }
+      },
+    );
+    app.get("/donation-requests", async (req, res) => {
+      try {
+        const donationRequests = await donationRequestCollection
+          .find({
+            status: {
+              $in: ["pending", "in-progress"],
+            },
+          })
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        res.status(200).json(donationRequests);
+      } catch (error) {
+        console.error("Get donation requests failed:", error);
+
+        res.status(500).json({
+          message: "Failed to fetch donation requests",
+        });
+      }
+    });
 
     app.get("/", (req, res) => {
       res.send("Blood Donation Server is running!");
     });
-   
 
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
