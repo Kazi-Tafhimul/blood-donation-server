@@ -305,6 +305,7 @@ async function run() {
         }
       },
     );
+
     app.patch(
       "/donation-requests/:id",
       verifyToken,
@@ -329,14 +330,18 @@ async function run() {
             });
           }
 
-          // Only request owner can edit
-          if (existingRequest.requesterId !== req.user.id) {
+          // Donor can edit only own request.
+          // Admin can edit any request.
+          if (
+            req.user.role !== "admin" &&
+            existingRequest.requesterId !== req.user.id
+          ) {
             return res.status(403).json({
               message: "You can only edit your own donation request",
             });
           }
 
-          // Do not allow editing completed/canceled requests
+          // Completed/canceled requests cannot be edited.
           if (
             existingRequest.status === "done" ||
             existingRequest.status === "canceled"
@@ -358,7 +363,6 @@ async function run() {
             requestMessage,
           } = req.body;
 
-          // Validate required fields
           if (
             !recipientName ||
             !bloodGroup ||
@@ -375,12 +379,22 @@ async function run() {
             });
           }
 
+          // IMPORTANT:
+          // Admin -> search only by _id
+          // Donor -> search by _id + requesterId
+          const updateFilter =
+            req.user.role === "admin"
+              ? {
+                  _id: new ObjectId(id),
+                }
+              : {
+                  _id: new ObjectId(id),
+                  requesterId: req.user.id,
+                };
+
           const updatedRequest =
             await donationRequestCollection.findOneAndUpdate(
-              {
-                _id: new ObjectId(id),
-                requesterId: req.user.id,
-              },
+              updateFilter,
               {
                 $set: {
                   recipientName,
@@ -419,6 +433,7 @@ async function run() {
         }
       },
     );
+
     app.patch(
       "/donation-requests/:id/status",
       verifyToken,
@@ -452,14 +467,18 @@ async function run() {
             });
           }
 
-          // Only request owner can change status
-          if (existingRequest.requesterId !== req.user.id) {
+          // Donor can update only own request.
+          // Admin can update any request.
+          if (
+            req.user.role !== "admin" &&
+            existingRequest.requesterId !== req.user.id
+          ) {
             return res.status(403).json({
               message: "You can only update your own donation request",
             });
           }
 
-          // Status can only change from in-progress
+          // Status can only change from in-progress.
           if (existingRequest.status !== "inprogress") {
             return res.status(400).json({
               message:
@@ -467,13 +486,24 @@ async function run() {
             });
           }
 
+          // IMPORTANT:
+          // Admin -> search only by _id
+          // Donor -> search by _id + requesterId
+          const updateFilter =
+            req.user.role === "admin"
+              ? {
+                  _id: new ObjectId(id),
+                  status: "inprogress",
+                }
+              : {
+                  _id: new ObjectId(id),
+                  requesterId: req.user.id,
+                  status: "inprogress",
+                };
+
           const updatedRequest =
             await donationRequestCollection.findOneAndUpdate(
-              {
-                _id: new ObjectId(id),
-                requesterId: req.user.id,
-                status: "inprogress",
-              },
+              updateFilter,
               {
                 $set: {
                   status,
@@ -528,8 +558,10 @@ async function run() {
             });
           }
 
-          // Only request owner can delete
-          if (existingRequest.requesterId !== req.user.id) {
+          if (
+            req.user.role !== "admin" &&
+            existingRequest.requesterId !== req.user.id
+          ) {
             return res.status(403).json({
               message: "You can only delete your own donation request",
             });
@@ -546,10 +578,18 @@ async function run() {
             });
           }
 
-          const result = await donationRequestCollection.deleteOne({
-            _id: new ObjectId(id),
-            requesterId: req.user.id,
-          });
+          const deleteFilter =
+            req.user.role === "admin"
+              ? {
+                  _id: new ObjectId(id),
+                }
+              : {
+                  _id: new ObjectId(id),
+                  requesterId: req.user.id,
+                };
+
+          const result =
+            await donationRequestCollection.deleteOne(deleteFilter);
 
           if (result.deletedCount === 0) {
             return res.status(404).json({
@@ -704,26 +744,26 @@ async function run() {
       },
     );
     app.get(
-  "/admin/donation-requests",
-  verifyToken,
-  requireRole("admin"),
-  async (req, res) => {
-    try {
-      const donationRequests = await donationRequestCollection
-        .find({})
-        .sort({ createdAt: -1 })
-        .toArray();
+      "/admin/donation-requests",
+      verifyToken,
+      requireRole("admin"),
+      async (req, res) => {
+        try {
+          const donationRequests = await donationRequestCollection
+            .find({})
+            .sort({ createdAt: -1 })
+            .toArray();
 
-      res.status(200).json(donationRequests);
-    } catch (error) {
-      console.error("Get all donation requests failed:", error);
+          res.status(200).json(donationRequests);
+        } catch (error) {
+          console.error("Get all donation requests failed:", error);
 
-      res.status(500).json({
-        message: "Failed to fetch all donation requests",
-      });
-    }
-  },
-);
+          res.status(500).json({
+            message: "Failed to fetch all donation requests",
+          });
+        }
+      },
+    );
     app.get(
       "/admin/users",
       verifyToken,
