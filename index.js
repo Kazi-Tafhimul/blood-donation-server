@@ -1,11 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-const {
-  MongoClient,
-  ServerApiVersion,
-  ObjectId,
-} = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const { createRemoteJWKSet, jwtVerify } = require("jose");
 
 const app = express();
@@ -309,7 +305,7 @@ async function run() {
         }
       },
     );
-     app.patch(
+    app.patch(
       "/donation-requests/:id",
       verifyToken,
       requireRole("donor"),
@@ -323,10 +319,9 @@ async function run() {
             });
           }
 
-          const existingRequest =
-            await donationRequestCollection.findOne({
-              _id: new ObjectId(id),
-            });
+          const existingRequest = await donationRequestCollection.findOne({
+            _id: new ObjectId(id),
+          });
 
           if (!existingRequest) {
             return res.status(404).json({
@@ -424,7 +419,7 @@ async function run() {
         }
       },
     );
-     app.patch(
+    app.patch(
       "/donation-requests/:id/status",
       verifyToken,
       requireRole("donor"),
@@ -447,10 +442,9 @@ async function run() {
             });
           }
 
-          const existingRequest =
-            await donationRequestCollection.findOne({
-              _id: new ObjectId(id),
-            });
+          const existingRequest = await donationRequestCollection.findOne({
+            _id: new ObjectId(id),
+          });
 
           if (!existingRequest) {
             return res.status(404).json({
@@ -524,10 +518,9 @@ async function run() {
             });
           }
 
-          const existingRequest =
-            await donationRequestCollection.findOne({
-              _id: new ObjectId(id),
-            });
+          const existingRequest = await donationRequestCollection.findOne({
+            _id: new ObjectId(id),
+          });
 
           if (!existingRequest) {
             return res.status(404).json({
@@ -553,11 +546,10 @@ async function run() {
             });
           }
 
-          const result =
-            await donationRequestCollection.deleteOne({
-              _id: new ObjectId(id),
-              requesterId: req.user.id,
-            });
+          const result = await donationRequestCollection.deleteOne({
+            _id: new ObjectId(id),
+            requesterId: req.user.id,
+          });
 
           if (result.deletedCount === 0) {
             return res.status(404).json({
@@ -577,126 +569,138 @@ async function run() {
         }
       },
     );
-     app.get(
-      "/profile",
+    app.get("/profile", verifyToken, async (req, res) => {
+      try {
+        const user = await userCollection.findOne(
+          {
+            _id: req.user.id,
+          },
+          {
+            projection: {
+              password: 0,
+            },
+          },
+        );
+
+        if (!user) {
+          return res.status(404).json({
+            message: "User profile not found",
+          });
+        }
+
+        res.status(200).json(user);
+      } catch (error) {
+        console.error("Get profile failed:", error);
+
+        res.status(500).json({
+          message: "Failed to fetch profile",
+        });
+      }
+    });
+    app.patch("/profile", verifyToken, async (req, res) => {
+      try {
+        const { name, bloodGroup, district, upazila, image, photo } = req.body;
+
+        if (!name?.trim()) {
+          return res.status(400).json({
+            message: "Name is required",
+          });
+        }
+
+        if (!bloodGroup) {
+          return res.status(400).json({
+            message: "Blood group is required",
+          });
+        }
+
+        if (!district) {
+          return res.status(400).json({
+            message: "District is required",
+          });
+        }
+
+        if (!upazila) {
+          return res.status(400).json({
+            message: "Upazila is required",
+          });
+        }
+
+        const updateData = {
+          name: name.trim(),
+          bloodGroup,
+          district,
+          upazila,
+          updatedAt: new Date(),
+        };
+
+        // Support either image or photo field
+        if (image !== undefined) {
+          updateData.image = image;
+        } else if (photo !== undefined) {
+          updateData.image = photo;
+        }
+
+        const updatedUser = await userCollection.findOneAndUpdate(
+          {
+            _id: req.user.id,
+          },
+          {
+            $set: updateData,
+          },
+          {
+            returnDocument: "after",
+            projection: {
+              password: 0,
+            },
+          },
+        );
+
+        if (!updatedUser) {
+          return res.status(404).json({
+            message: "User profile not found",
+          });
+        }
+
+        res.status(200).json({
+          message: "Profile updated successfully",
+          user: updatedUser,
+        });
+      } catch (error) {
+        console.error("Update profile failed:", error);
+
+        res.status(500).json({
+          message: "Failed to update profile",
+        });
+      }
+    });
+    app.get(
+      "/admin/users",
       verifyToken,
+      requireRole("admin"),
       async (req, res) => {
         try {
-          const user = await userCollection.findOne(
-            {
-              _id: req.user.id,
-            },
-            {
-              projection: {
-                password: 0,
+          const users = await userCollection
+            .find(
+              {},
+              {
+                projection: {
+                  password: 0,
+                },
               },
-            },
-          );
+            )
+            .sort({ createdAt: -1 })
+            .toArray();
 
-          if (!user) {
-            return res.status(404).json({
-              message: "User profile not found",
-            });
-          }
-
-          res.status(200).json(user);
+          res.status(200).json(users);
         } catch (error) {
-          console.error("Get profile failed:", error);
+          console.error("Get all users failed:", error);
 
           res.status(500).json({
-            message: "Failed to fetch profile",
+            message: "Failed to fetch users",
           });
         }
       },
     );
-     app.patch(
-      "/profile",
-      verifyToken,
-      async (req, res) => {
-        try {
-          const {
-            name,
-            bloodGroup,
-            district,
-            upazila,
-            image,
-            photo,
-          } = req.body;
-
-          if (!name?.trim()) {
-            return res.status(400).json({
-              message: "Name is required",
-            });
-          }
-
-          if (!bloodGroup) {
-            return res.status(400).json({
-              message: "Blood group is required",
-            });
-          }
-
-          if (!district) {
-            return res.status(400).json({
-              message: "District is required",
-            });
-          }
-
-          if (!upazila) {
-            return res.status(400).json({
-              message: "Upazila is required",
-            });
-          }
-
-          const updateData = {
-            name: name.trim(),
-            bloodGroup,
-            district,
-            upazila,
-            updatedAt: new Date(),
-          };
-
-          // Support either image or photo field
-          if (image !== undefined) {
-            updateData.image = image;
-          } else if (photo !== undefined) {
-            updateData.image = photo;
-          }
-
-          const updatedUser = await userCollection.findOneAndUpdate(
-            {
-              _id: req.user.id,
-            },
-            {
-              $set: updateData,
-            },
-            {
-              returnDocument: "after",
-              projection: {
-                password: 0,
-              },
-            },
-          );
-
-          if (!updatedUser) {
-            return res.status(404).json({
-              message: "User profile not found",
-            });
-          }
-
-          res.status(200).json({
-            message: "Profile updated successfully",
-            user: updatedUser,
-          });
-        } catch (error) {
-          console.error("Update profile failed:", error);
-
-          res.status(500).json({
-            message: "Failed to update profile",
-          });
-        }
-      },
-    );
-
 
     app.get("/", (req, res) => {
       res.send("Blood Donation Server is running!");
