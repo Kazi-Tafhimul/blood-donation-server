@@ -88,7 +88,7 @@ async function run() {
     app.post(
       "/donation-requests",
       verifyToken,
-      requireRole("donor","admin"),
+      requireRole("donor", "admin"),
       async (req, res) => {
         try {
           const {
@@ -209,7 +209,7 @@ async function run() {
     app.patch(
       "/donation-requests/:id/donate",
       verifyToken,
-      requireRole("donor","admin"),
+      requireRole("donor", "admin"),
       async (req, res) => {
         try {
           const { ObjectId } = require("mongodb");
@@ -285,7 +285,7 @@ async function run() {
     app.get(
       "/my-donation-requests",
       verifyToken,
-      requireRole("donor","admin"),
+      requireRole("donor", "admin"),
       async (req, res) => {
         try {
           const donationRequests = await donationRequestCollection
@@ -308,7 +308,7 @@ async function run() {
     app.patch(
       "/donation-requests/:id",
       verifyToken,
-      requireRole("donor","admin"),
+      requireRole("donor", "admin"),
       async (req, res) => {
         try {
           const { id } = req.params;
@@ -422,7 +422,7 @@ async function run() {
     app.patch(
       "/donation-requests/:id/status",
       verifyToken,
-      requireRole("donor","admin"),
+      requireRole("donor", "admin"),
       async (req, res) => {
         try {
           const { id } = req.params;
@@ -507,7 +507,7 @@ async function run() {
     app.delete(
       "/donation-requests/:id",
       verifyToken,
-      requireRole("donor","admin"),
+      requireRole("donor", "admin"),
       async (req, res) => {
         try {
           const { id } = req.params;
@@ -674,172 +674,223 @@ async function run() {
       }
     });
     app.get(
-  "/admin/users",
+      "/dashboard/stats",
+      verifyToken,
+      requireRole("admin", "volunteer"),
+      async (req, res) => {
+        try {
+          const totalDonors = await userCollection.countDocuments({
+            role: "donor",
+          });
+
+          const totalFunding = 0;
+
+          const totalRequests = await donationRequestCollection.countDocuments(
+            {},
+          );
+
+          res.status(200).json({
+            totalDonors,
+            totalFunding,
+            totalRequests,
+          });
+        } catch (error) {
+          console.error("Get dashboard stats failed:", error);
+
+          res.status(500).json({
+            message: "Failed to fetch dashboard statistics",
+          });
+        }
+      },
+    );
+    app.get(
+  "/admin/donation-requests",
   verifyToken,
   requireRole("admin"),
   async (req, res) => {
     try {
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
-      const status = req.query.status;
-
-      const skip = (page - 1) * limit;
-
-      // Filter
-      const filter = {};
-
-      if (status === "active" || status === "blocked") {
-        filter.status = status;
-      }
-
-      // Total users
-      const totalUsers = await userCollection.countDocuments(filter);
-
-      // Users for current page
-      const users = await userCollection
-        .find(filter, {
-          projection: {
-            password: 0,
-          },
-        })
+      const donationRequests = await donationRequestCollection
+        .find({})
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
         .toArray();
 
-      const totalPages = Math.ceil(totalUsers / limit);
-
-      res.status(200).json({
-        users,
-        totalUsers,
-        totalPages,
-        currentPage: page,
-      });
+      res.status(200).json(donationRequests);
     } catch (error) {
-      console.error("Get all users failed:", error);
+      console.error("Get all donation requests failed:", error);
 
       res.status(500).json({
-        message: "Failed to fetch users",
+        message: "Failed to fetch all donation requests",
       });
     }
   },
 );
+    app.get(
+      "/admin/users",
+      verifyToken,
+      requireRole("admin"),
+      async (req, res) => {
+        try {
+          const page = parseInt(req.query.page) || 1;
+          const limit = parseInt(req.query.limit) || 10;
+          const status = req.query.status;
+
+          const skip = (page - 1) * limit;
+
+          // Filter
+          const filter = {};
+
+          if (status === "active" || status === "blocked") {
+            filter.status = status;
+          }
+
+          // Total users
+          const totalUsers = await userCollection.countDocuments(filter);
+
+          // Users for current page
+          const users = await userCollection
+            .find(filter, {
+              projection: {
+                password: 0,
+              },
+            })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .toArray();
+
+          const totalPages = Math.ceil(totalUsers / limit);
+
+          res.status(200).json({
+            users,
+            totalUsers,
+            totalPages,
+            currentPage: page,
+          });
+        } catch (error) {
+          console.error("Get all users failed:", error);
+
+          res.status(500).json({
+            message: "Failed to fetch users",
+          });
+        }
+      },
+    );
     app.patch(
-  "/admin/users/:id/status",
-  verifyToken,
-  requireRole("admin"),
-  async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { status } = req.body;
+      "/admin/users/:id/status",
+      verifyToken,
+      requireRole("admin"),
+      async (req, res) => {
+        try {
+          const { id } = req.params;
+          const { status } = req.body;
 
-      if (!ObjectId.isValid(id)) {
-        return res.status(400).json({
-          message: "Invalid user ID",
-        });
-      }
+          if (!ObjectId.isValid(id)) {
+            return res.status(400).json({
+              message: "Invalid user ID",
+            });
+          }
 
-      if (!["active", "blocked"].includes(status)) {
-        return res.status(400).json({
-          message: "Invalid status",
-        });
-      }
+          if (!["active", "blocked"].includes(status)) {
+            return res.status(400).json({
+              message: "Invalid status",
+            });
+          }
 
-      const updatedUser = await userCollection.findOneAndUpdate(
-        {
-          _id: new ObjectId(id),
-        },
-        {
-          $set: {
-            status,
-            updatedAt: new Date(),
-          },
-        },
-        {
-          returnDocument: "after",
-          projection: {
-            password: 0,
-          },
-        },
-      );
+          const updatedUser = await userCollection.findOneAndUpdate(
+            {
+              _id: new ObjectId(id),
+            },
+            {
+              $set: {
+                status,
+                updatedAt: new Date(),
+              },
+            },
+            {
+              returnDocument: "after",
+              projection: {
+                password: 0,
+              },
+            },
+          );
 
-      if (!updatedUser) {
-        return res.status(404).json({
-          message: "User not found",
-        });
-      }
+          if (!updatedUser) {
+            return res.status(404).json({
+              message: "User not found",
+            });
+          }
 
-      res.status(200).json({
-        message: `User ${status === "blocked" ? "blocked" : "unblocked"} successfully`,
-        user: updatedUser,
-      });
-    } catch (error) {
-      console.error("Update user status failed:", error);
+          res.status(200).json({
+            message: `User ${status === "blocked" ? "blocked" : "unblocked"} successfully`,
+            user: updatedUser,
+          });
+        } catch (error) {
+          console.error("Update user status failed:", error);
 
-      res.status(500).json({
-        message: "Failed to update user status",
-      });
-    }
-  },
-);
-app.patch(
-  "/admin/users/:id/role",
-  verifyToken,
-  requireRole("admin"),
-  async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { role } = req.body;
+          res.status(500).json({
+            message: "Failed to update user status",
+          });
+        }
+      },
+    );
+    app.patch(
+      "/admin/users/:id/role",
+      verifyToken,
+      requireRole("admin"),
+      async (req, res) => {
+        try {
+          const { id } = req.params;
+          const { role } = req.body;
 
-      if (!ObjectId.isValid(id)) {
-        return res.status(400).json({
-          message: "Invalid user ID",
-        });
-      }
+          if (!ObjectId.isValid(id)) {
+            return res.status(400).json({
+              message: "Invalid user ID",
+            });
+          }
 
-      if (!["donor", "volunteer", "admin"].includes(role)) {
-        return res.status(400).json({
-          message: "Invalid role",
-        });
-      }
+          if (!["donor", "volunteer", "admin"].includes(role)) {
+            return res.status(400).json({
+              message: "Invalid role",
+            });
+          }
 
-      const updatedUser = await userCollection.findOneAndUpdate(
-        {
-          _id: new ObjectId(id),
-        },
-        {
-          $set: {
-            role,
-            updatedAt: new Date(),
-          },
-        },
-        {
-          returnDocument: "after",
-          projection: {
-            password: 0,
-          },
-        },
-      );
+          const updatedUser = await userCollection.findOneAndUpdate(
+            {
+              _id: new ObjectId(id),
+            },
+            {
+              $set: {
+                role,
+                updatedAt: new Date(),
+              },
+            },
+            {
+              returnDocument: "after",
+              projection: {
+                password: 0,
+              },
+            },
+          );
 
-      if (!updatedUser) {
-        return res.status(404).json({
-          message: "User not found",
-        });
-      }
+          if (!updatedUser) {
+            return res.status(404).json({
+              message: "User not found",
+            });
+          }
 
-      res.status(200).json({
-        message: `User role updated to ${role}`,
-        user: updatedUser,
-      });
-    } catch (error) {
-      console.error("Update user role failed:", error);
+          res.status(200).json({
+            message: `User role updated to ${role}`,
+            user: updatedUser,
+          });
+        } catch (error) {
+          console.error("Update user role failed:", error);
 
-      res.status(500).json({
-        message: "Failed to update user role",
-      });
-    }
-  },
-);
+          res.status(500).json({
+            message: "Failed to update user role",
+          });
+        }
+      },
+    );
 
     app.get("/", (req, res) => {
       res.send("Blood Donation Server is running!");
