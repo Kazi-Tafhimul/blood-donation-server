@@ -424,6 +424,92 @@ async function run() {
         }
       },
     );
+     app.patch(
+      "/donation-requests/:id/status",
+      verifyToken,
+      requireRole("donor"),
+      async (req, res) => {
+        try {
+          const { id } = req.params;
+          const { status } = req.body;
+
+          if (!ObjectId.isValid(id)) {
+            return res.status(400).json({
+              message: "Invalid donation request ID",
+            });
+          }
+
+          const allowedStatuses = ["done", "canceled"];
+
+          if (!allowedStatuses.includes(status)) {
+            return res.status(400).json({
+              message: "Invalid status. Allowed values are done or canceled",
+            });
+          }
+
+          const existingRequest =
+            await donationRequestCollection.findOne({
+              _id: new ObjectId(id),
+            });
+
+          if (!existingRequest) {
+            return res.status(404).json({
+              message: "Donation request not found",
+            });
+          }
+
+          // Only request owner can change status
+          if (existingRequest.requesterId !== req.user.id) {
+            return res.status(403).json({
+              message: "You can only update your own donation request",
+            });
+          }
+
+          // Status can only change from in-progress
+          if (existingRequest.status !== "in-progress") {
+            return res.status(400).json({
+              message:
+                "Donation status can only be changed when it is in-progress",
+            });
+          }
+
+          const updatedRequest =
+            await donationRequestCollection.findOneAndUpdate(
+              {
+                _id: new ObjectId(id),
+                requesterId: req.user.id,
+                status: "in-progress",
+              },
+              {
+                $set: {
+                  status,
+                  updatedAt: new Date(),
+                },
+              },
+              {
+                returnDocument: "after",
+              },
+            );
+
+          if (!updatedRequest) {
+            return res.status(409).json({
+              message: "Donation request status could not be updated",
+            });
+          }
+
+          res.status(200).json({
+            message: `Donation request marked as ${status}`,
+            donationRequest: updatedRequest,
+          });
+        } catch (error) {
+          console.error("Update donation status failed:", error);
+
+          res.status(500).json({
+            message: "Failed to update donation request status",
+          });
+        }
+      },
+    );
 
     app.get("/", (req, res) => {
       res.send("Blood Donation Server is running!");
