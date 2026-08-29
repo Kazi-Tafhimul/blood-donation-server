@@ -255,7 +255,7 @@ async function run() {
             },
             {
               $set: {
-                status: "in-progress",
+                status: "inprogress",
                 donorId: donor.donorId,
                 donorName: donor.donorName,
                 donorEmail: donor.donorEmail,
@@ -466,7 +466,7 @@ async function run() {
           }
 
           // Status can only change from in-progress
-          if (existingRequest.status !== "in-progress") {
+          if (existingRequest.status !== "inprogress") {
             return res.status(400).json({
               message:
                 "Donation status can only be changed when it is in-progress",
@@ -478,7 +478,7 @@ async function run() {
               {
                 _id: new ObjectId(id),
                 requesterId: req.user.id,
-                status: "in-progress",
+                status: "inprogress",
               },
               {
                 $set: {
