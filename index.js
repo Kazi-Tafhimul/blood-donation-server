@@ -577,6 +577,39 @@ async function run() {
         }
       },
     );
+     app.get(
+      "/profile",
+      verifyToken,
+      async (req, res) => {
+        try {
+          const user = await userCollection.findOne(
+            {
+              _id: req.user.id,
+            },
+            {
+              projection: {
+                password: 0,
+              },
+            },
+          );
+
+          if (!user) {
+            return res.status(404).json({
+              message: "User profile not found",
+            });
+          }
+
+          res.status(200).json(user);
+        } catch (error) {
+          console.error("Get profile failed:", error);
+
+          res.status(500).json({
+            message: "Failed to fetch profile",
+          });
+        }
+      },
+    );
+
 
     app.get("/", (req, res) => {
       res.send("Blood Donation Server is running!");
