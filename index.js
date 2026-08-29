@@ -88,7 +88,7 @@ async function run() {
     app.post(
       "/donation-requests",
       verifyToken,
-      requireRole("donor"),
+      requireRole("donor","admin"),
       async (req, res) => {
         try {
           const {
@@ -209,7 +209,7 @@ async function run() {
     app.patch(
       "/donation-requests/:id/donate",
       verifyToken,
-      requireRole("donor"),
+      requireRole("donor","admin"),
       async (req, res) => {
         try {
           const { ObjectId } = require("mongodb");
@@ -285,7 +285,7 @@ async function run() {
     app.get(
       "/my-donation-requests",
       verifyToken,
-      requireRole("donor"),
+      requireRole("donor","admin"),
       async (req, res) => {
         try {
           const donationRequests = await donationRequestCollection
@@ -308,7 +308,7 @@ async function run() {
     app.patch(
       "/donation-requests/:id",
       verifyToken,
-      requireRole("donor"),
+      requireRole("donor","admin"),
       async (req, res) => {
         try {
           const { id } = req.params;
@@ -422,7 +422,7 @@ async function run() {
     app.patch(
       "/donation-requests/:id/status",
       verifyToken,
-      requireRole("donor"),
+      requireRole("donor","admin"),
       async (req, res) => {
         try {
           const { id } = req.params;
@@ -507,7 +507,7 @@ async function run() {
     app.delete(
       "/donation-requests/:id",
       verifyToken,
-      requireRole("donor"),
+      requireRole("donor","admin"),
       async (req, res) => {
         try {
           const { id } = req.params;
