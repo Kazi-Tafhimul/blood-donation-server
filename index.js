@@ -79,7 +79,7 @@ async function run() {
   try {
     await client.connect();
     const db = client.db("blood-donation-db");
-    const userCollection = db.collection("users");
+    const userCollection = db.collection("user");
     const donationRequestCollection = db.collection("donationRequests");
 
     await client.db("admin").command({ ping: 1 });
