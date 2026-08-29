@@ -174,6 +174,114 @@ async function run() {
         });
       }
     });
+    app.get("/donation-requests/:id", async (req, res) => {
+      try {
+        const { ObjectId } = require("mongodb");
+
+        const { id } = req.params;
+
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).json({
+            message: "Invalid donation request ID",
+          });
+        }
+
+        const donationRequest = await donationRequestCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!donationRequest) {
+          return res.status(404).json({
+            message: "Donation request not found",
+          });
+        }
+
+        res.status(200).json(donationRequest);
+      } catch (error) {
+        console.error("Get donation request details failed:", error);
+
+        res.status(500).json({
+          message: "Failed to fetch donation request",
+        });
+      }
+    });
+
+    app.patch(
+      "/donation-requests/:id/donate",
+      verifyToken,
+      requireRole("donor"),
+      async (req, res) => {
+        try {
+          const { ObjectId } = require("mongodb");
+
+          const { id } = req.params;
+
+          if (!ObjectId.isValid(id)) {
+            return res.status(400).json({
+              message: "Invalid donation request ID",
+            });
+          }
+
+          const donationRequest = await donationRequestCollection.findOne({
+            _id: new ObjectId(id),
+          });
+
+          if (!donationRequest) {
+            return res.status(404).json({
+              message: "Donation request not found",
+            });
+          }
+
+          if (donationRequest.status !== "pending") {
+            return res.status(400).json({
+              message: "This donation request is no longer available",
+            });
+          }
+
+          const donor = {
+            donorId: req.user.id,
+            donorName: req.user.name,
+            donorEmail: req.user.email,
+          };
+
+          const result = await donationRequestCollection.findOneAndUpdate(
+            {
+              _id: new ObjectId(id),
+              status: "pending",
+            },
+            {
+              $set: {
+                status: "in-progress",
+                donorId: donor.donorId,
+                donorName: donor.donorName,
+                donorEmail: donor.donorEmail,
+                updatedAt: new Date(),
+              },
+            },
+            {
+              returnDocument: "after",
+            },
+          );
+
+          if (!result) {
+            return res.status(409).json({
+              message: "This donation request has already been accepted",
+            });
+          }
+
+          res.status(200).json({
+            message: "Donation confirmed successfully",
+            donationRequest: result,
+          });
+        } catch (error) {
+          console.error("Confirm donation failed:", error);
+
+          res.status(500).json({
+            message: "Failed to confirm donation",
+          });
+        }
+      },
+    );
 
     app.get("/", (req, res) => {
       res.send("Blood Donation Server is running!");
