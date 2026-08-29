@@ -674,33 +674,56 @@ async function run() {
       }
     });
     app.get(
-      "/admin/users",
-      verifyToken,
-      requireRole("admin"),
-      async (req, res) => {
-        try {
-          const users = await userCollection
-            .find(
-              {},
-              {
-                projection: {
-                  password: 0,
-                },
-              },
-            )
-            .sort({ createdAt: -1 })
-            .toArray();
+  "/admin/users",
+  verifyToken,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const status = req.query.status;
 
-          res.status(200).json(users);
-        } catch (error) {
-          console.error("Get all users failed:", error);
+      const skip = (page - 1) * limit;
 
-          res.status(500).json({
-            message: "Failed to fetch users",
-          });
-        }
-      },
-    );
+      // Filter
+      const filter = {};
+
+      if (status === "active" || status === "blocked") {
+        filter.status = status;
+      }
+
+      // Total users
+      const totalUsers = await userCollection.countDocuments(filter);
+
+      // Users for current page
+      const users = await userCollection
+        .find(filter, {
+          projection: {
+            password: 0,
+          },
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+
+      const totalPages = Math.ceil(totalUsers / limit);
+
+      res.status(200).json({
+        users,
+        totalUsers,
+        totalPages,
+        currentPage: page,
+      });
+    } catch (error) {
+      console.error("Get all users failed:", error);
+
+      res.status(500).json({
+        message: "Failed to fetch users",
+      });
+    }
+  },
+);
     app.patch(
   "/admin/users/:id/status",
   verifyToken,
