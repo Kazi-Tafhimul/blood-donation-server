@@ -160,9 +160,7 @@ async function run() {
       try {
         const donationRequests = await donationRequestCollection
           .find({
-            status: {
-              $in: ["pending", "in-progress"],
-            },
+            status: "pending",
           })
           .sort({ createdAt: -1 })
           .toArray();
