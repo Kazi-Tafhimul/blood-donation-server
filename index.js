@@ -309,6 +309,121 @@ async function run() {
         }
       },
     );
+     app.patch(
+      "/donation-requests/:id",
+      verifyToken,
+      requireRole("donor"),
+      async (req, res) => {
+        try {
+          const { id } = req.params;
+
+          if (!ObjectId.isValid(id)) {
+            return res.status(400).json({
+              message: "Invalid donation request ID",
+            });
+          }
+
+          const existingRequest =
+            await donationRequestCollection.findOne({
+              _id: new ObjectId(id),
+            });
+
+          if (!existingRequest) {
+            return res.status(404).json({
+              message: "Donation request not found",
+            });
+          }
+
+          // Only request owner can edit
+          if (existingRequest.requesterId !== req.user.id) {
+            return res.status(403).json({
+              message: "You can only edit your own donation request",
+            });
+          }
+
+          // Do not allow editing completed/canceled requests
+          if (
+            existingRequest.status === "done" ||
+            existingRequest.status === "canceled"
+          ) {
+            return res.status(400).json({
+              message: "Completed or canceled requests cannot be edited",
+            });
+          }
+
+          const {
+            recipientName,
+            bloodGroup,
+            district,
+            upazila,
+            hospitalName,
+            fullAddress,
+            donationDate,
+            donationTime,
+            requestMessage,
+          } = req.body;
+
+          // Validate required fields
+          if (
+            !recipientName ||
+            !bloodGroup ||
+            !district ||
+            !upazila ||
+            !hospitalName ||
+            !fullAddress ||
+            !donationDate ||
+            !donationTime ||
+            !requestMessage
+          ) {
+            return res.status(400).json({
+              message: "All fields are required",
+            });
+          }
+
+          const updatedRequest =
+            await donationRequestCollection.findOneAndUpdate(
+              {
+                _id: new ObjectId(id),
+                requesterId: req.user.id,
+              },
+              {
+                $set: {
+                  recipientName,
+                  bloodGroup,
+                  district,
+                  upazila,
+                  hospitalName,
+                  fullAddress,
+                  donationDate,
+                  donationTime,
+                  requestMessage,
+                  updatedAt: new Date(),
+                },
+              },
+              {
+                returnDocument: "after",
+              },
+            );
+
+          if (!updatedRequest) {
+            return res.status(404).json({
+              message: "Donation request not found",
+            });
+          }
+
+          res.status(200).json({
+            message: "Donation request updated successfully",
+            donationRequest: updatedRequest,
+          });
+        } catch (error) {
+          console.error("Update donation request failed:", error);
+
+          res.status(500).json({
+            message: "Failed to update donation request",
+          });
+        }
+      },
+    );
 
     app.get("/", (req, res) => {
       res.send("Blood Donation Server is running!");
