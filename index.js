@@ -759,6 +759,64 @@ async function run() {
     }
   },
 );
+app.patch(
+  "/admin/users/:id/role",
+  verifyToken,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { role } = req.body;
+
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).json({
+          message: "Invalid user ID",
+        });
+      }
+
+      if (!["donor", "volunteer", "admin"].includes(role)) {
+        return res.status(400).json({
+          message: "Invalid role",
+        });
+      }
+
+      const updatedUser = await userCollection.findOneAndUpdate(
+        {
+          _id: new ObjectId(id),
+        },
+        {
+          $set: {
+            role,
+            updatedAt: new Date(),
+          },
+        },
+        {
+          returnDocument: "after",
+          projection: {
+            password: 0,
+          },
+        },
+      );
+
+      if (!updatedUser) {
+        return res.status(404).json({
+          message: "User not found",
+        });
+      }
+
+      res.status(200).json({
+        message: `User role updated to ${role}`,
+        user: updatedUser,
+      });
+    } catch (error) {
+      console.error("Update user role failed:", error);
+
+      res.status(500).json({
+        message: "Failed to update user role",
+      });
+    }
+  },
+);
 
     app.get("/", (req, res) => {
       res.send("Blood Donation Server is running!");
