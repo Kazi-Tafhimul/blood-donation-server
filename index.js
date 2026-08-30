@@ -455,7 +455,7 @@ async function run() {
     app.patch(
       "/donation-requests/:id/status",
       verifyToken,
-      requireRole("donor", "admin"),
+      requireRole("donor", "admin", "volunteer"),
       async (req, res) => {
         try {
           const { id } = req.params;
@@ -488,7 +488,7 @@ async function run() {
           // Donor can update only own request.
           // Admin can update any request.
           if (
-            req.user.role !== "admin" &&
+            req.user.role === "donor" &&
             existingRequest.requesterId !== req.user.id
           ) {
             return res.status(403).json({
@@ -508,7 +508,7 @@ async function run() {
           // Admin -> search only by _id
           // Donor -> search by _id + requesterId
           const updateFilter =
-            req.user.role === "admin"
+            req.user.role === "admin" ||  req.user.role === "volunteer"
               ? {
                   _id: new ObjectId(id),
                   status: "inprogress",
@@ -765,7 +765,7 @@ async function run() {
     app.get(
       "/admin/donation-requests",
       verifyToken,
-      requireRole("admin"),
+      requireRole("admin", "volunteer"),
       async (req, res) => {
         try {
           const donationRequests = await donationRequestCollection
