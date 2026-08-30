@@ -303,7 +303,7 @@ async function run() {
     app.get(
       "/my-donation-requests",
       verifyToken,
-      requireRole("donor", "admin"),
+      requireRole("donor", "admin", "volunteer"),
       async (req, res) => {
         try {
           const donationRequests = await donationRequestCollection
@@ -327,7 +327,7 @@ async function run() {
     app.patch(
       "/donation-requests/:id",
       verifyToken,
-      requireRole("donor", "admin"),
+      requireRole("donor", "admin", "volunteer"),
       async (req, res) => {
         try {
           const { id } = req.params;
@@ -555,7 +555,7 @@ async function run() {
     app.delete(
       "/donation-requests/:id",
       verifyToken,
-      requireRole("donor", "admin"),
+      requireRole("donor", "admin", "volunteer"),
       async (req, res) => {
         try {
           const { id } = req.params;
