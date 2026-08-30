@@ -31,7 +31,6 @@ const JWKS = createRemoteJWKSet(
 );
 const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  // console.log("AUTH HEADER:", authHeader);
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({
@@ -352,8 +351,6 @@ async function run() {
             });
           }
 
-          // Donor can edit only own request.
-          // Admin can edit any request.
           if (
             req.user.role !== "admin" &&
             existingRequest.requesterId !== req.user.id
@@ -363,7 +360,6 @@ async function run() {
             });
           }
 
-          // Completed/canceled requests cannot be edited.
           if (
             existingRequest.status === "done" ||
             existingRequest.status === "canceled"
@@ -401,9 +397,6 @@ async function run() {
             });
           }
 
-          // IMPORTANT:
-          // Admin -> search only by _id
-          // Donor -> search by _id + requesterId
           const updateFilter =
             req.user.role === "admin"
               ? {
@@ -489,8 +482,6 @@ async function run() {
             });
           }
 
-          // Donor can update only own request.
-          // Admin can update any request.
           if (
             req.user.role === "donor" &&
             existingRequest.requesterId !== req.user.id
@@ -500,7 +491,6 @@ async function run() {
             });
           }
 
-          // Status can only change from in-progress.
           if (existingRequest.status !== "inprogress") {
             return res.status(400).json({
               message:
@@ -508,9 +498,6 @@ async function run() {
             });
           }
 
-          // IMPORTANT:
-          // Admin -> search only by _id
-          // Donor -> search by _id + requesterId
           const updateFilter =
             req.user.role === "admin" || req.user.role === "volunteer"
               ? {
@@ -589,7 +576,6 @@ async function run() {
             });
           }
 
-          // Prevent deleting completed/canceled requests
           if (
             existingRequest.status === "done" ||
             existingRequest.status === "canceled"
@@ -631,7 +617,7 @@ async function run() {
         }
       },
     );
-    // console.log("PROFILE ROUTE REGISTERED");
+
     app.get("/profile", verifyToken, async (req, res) => {
       try {
         const user = await userCollection.findOne(
@@ -696,7 +682,6 @@ async function run() {
           updatedAt: new Date(),
         };
 
-        // Support either image or photo field
         if (image !== undefined) {
           updateData.image = image;
         } else if (photo !== undefined) {
@@ -736,6 +721,108 @@ async function run() {
         });
       }
     });
+
+    app.get("/public-stats", async (req, res) => {
+      try {
+        const activeUsers = await userCollection.countDocuments({
+          status: "active",
+          role: "donor",
+        });
+
+        const fundingResult = await fundingCollection
+          .aggregate([
+            {
+              $match: {
+                paymentStatus: "paid",
+              },
+            },
+            {
+              $group: {
+                _id: null,
+                totalFunding: {
+                  $sum: "$amount",
+                },
+              },
+            },
+          ])
+          .toArray();
+
+        const totalFunding = fundingResult[0]?.totalFunding || 0;
+
+        const totalBloodRequests =
+          await donationRequestCollection.countDocuments({
+            status: {
+              $in: ["pending", "inprogress"],
+            },
+          });
+
+        res.status(200).json({
+          activeUsers,
+          totalFunding,
+          totalBloodRequests,
+        });
+      } catch (error) {
+        console.error("Get public stats failed:", error);
+
+        res.status(500).json({
+          message: "Failed to fetch public statistics",
+        });
+      }
+    });
+
+    app.get("/donors", async (req, res) => {
+      try {
+        const { bloodGroup, district, upazila } = req.query;
+
+        if (!bloodGroup) {
+          return res.status(400).json({
+            message: "Blood group is required",
+          });
+        }
+
+        if (!district) {
+          return res.status(400).json({
+            message: "District is required",
+          });
+        }
+
+        if (!upazila) {
+          return res.status(400).json({
+            message: "Upazila is required",
+          });
+        }
+
+        const donors = await userCollection
+          .find(
+            {
+              bloodGroup,
+              district,
+              upazila,
+              role: "donor",
+              status: "active",
+            },
+            {
+              projection: {
+                password: 0,
+                email: 0,
+                emailVerified: 0,
+              },
+            },
+          )
+          .toArray();
+
+        res.status(200).json({
+          donors,
+        });
+      } catch (error) {
+        console.error("Find donors failed:", error);
+
+        res.status(500).json({
+          message: "Failed to find donors",
+        });
+      }
+    });
+
     app.get(
       "/fundings",
       verifyToken,
@@ -878,17 +965,14 @@ async function run() {
 
           const skip = (page - 1) * limit;
 
-          // Filter
           const filter = {};
 
           if (status === "active" || status === "blocked") {
             filter.status = status;
           }
 
-          // Total users
           const totalUsers = await userCollection.countDocuments(filter);
 
-          // Users for current page
           const users = await userCollection
             .find(filter, {
               projection: {
