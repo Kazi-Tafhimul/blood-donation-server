@@ -3,6 +3,9 @@ const cors = require("cors");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const { createRemoteJWKSet, jwtVerify } = require("jose");
+const Stripe = require("stripe");
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -83,6 +86,7 @@ async function run() {
     const db = client.db("blood-donation-db");
     const userCollection = db.collection("user");
     const donationRequestCollection = db.collection("donationRequests");
+    const fundingCollection = db.collection("fundings");
 
     await client.db("admin").command({ ping: 1 });
 
@@ -227,7 +231,7 @@ async function run() {
     app.patch(
       "/donation-requests/:id/donate",
       verifyToken,
-      requireRole("donor", "admin"),
+      requireRole("donor", "admin", "volunteer"),
       async (req, res) => {
         try {
           const { ObjectId } = require("mongodb");
@@ -508,7 +512,7 @@ async function run() {
           // Admin -> search only by _id
           // Donor -> search by _id + requesterId
           const updateFilter =
-            req.user.role === "admin" ||  req.user.role === "volunteer"
+            req.user.role === "admin" || req.user.role === "volunteer"
               ? {
                   _id: new ObjectId(id),
                   status: "inprogress",
@@ -733,6 +737,67 @@ async function run() {
       }
     });
     app.get(
+      "/fundings",
+      verifyToken,
+      requireRole("admin", "volunteer", "donor"),
+      async (req, res) => {
+        try {
+          const fundings = await fundingCollection
+            .find({
+              paymentStatus: "paid",
+            })
+            .sort({ createdAt: -1 })
+            .toArray();
+
+          res.status(200).json(fundings);
+        } catch (error) {
+          console.error("Get fundings failed:", error);
+
+          res.status(500).json({
+            message: "Failed to fetch fundings",
+          });
+        }
+      },
+    );
+    app.get(
+      "/fundings/total",
+      verifyToken,
+      requireRole("admin", "volunteer"),
+      async (req, res) => {
+        try {
+          const result = await fundingCollection
+            .aggregate([
+              {
+                $match: {
+                  paymentStatus: "paid",
+                },
+              },
+              {
+                $group: {
+                  _id: null,
+                  totalFunding: {
+                    $sum: "$amount",
+                  },
+                },
+              },
+            ])
+            .toArray();
+
+          const totalFunding = result[0]?.totalFunding || 0;
+
+          res.status(200).json({
+            totalFunding,
+          });
+        } catch (error) {
+          console.error("Get total funding failed:", error);
+
+          res.status(500).json({
+            message: "Failed to fetch total funding",
+          });
+        }
+      },
+    );
+    app.get(
       "/dashboard/stats",
       verifyToken,
       requireRole("admin", "volunteer"),
@@ -742,7 +807,25 @@ async function run() {
             role: "donor",
           });
 
-          const totalFunding = 0;
+          const fundingResult = await fundingCollection
+            .aggregate([
+              {
+                $match: {
+                  paymentStatus: "paid",
+                },
+              },
+              {
+                $group: {
+                  _id: null,
+                  totalFunding: {
+                    $sum: "$amount",
+                  },
+                },
+              },
+            ])
+            .toArray();
+
+          const totalFunding = fundingResult[0]?.totalFunding || 0;
 
           const totalRequests = await donationRequestCollection.countDocuments(
             {},
@@ -950,6 +1033,130 @@ async function run() {
         }
       },
     );
+    app.post(
+      "/fundings/create-checkout-session",
+      verifyToken,
+      async (req, res) => {
+        try {
+          const { amount } = req.body;
+
+          const fundAmount = Number(amount);
+
+          if (!fundAmount || fundAmount <= 0) {
+            return res.status(400).json({
+              message: "Please provide a valid funding amount",
+            });
+          }
+
+          const session = await stripe.checkout.sessions.create({
+            payment_method_types: ["card"],
+
+            line_items: [
+              {
+                price_data: {
+                  currency: "bdt",
+                  product_data: {
+                    name: "BloodLink Organization Funding",
+                  },
+                  unit_amount: Math.round(fundAmount * 100),
+                },
+                quantity: 1,
+              },
+            ],
+
+            mode: "payment",
+
+            success_url: `${process.env.CLIENT_URL}/funding/success?session_id={CHECKOUT_SESSION_ID}`,
+
+            cancel_url: `${process.env.CLIENT_URL}/funding`,
+            metadata: {
+              userId: req.user.id,
+              userName: req.user.name,
+              userEmail: req.user.email,
+              amount: fundAmount.toString(),
+            },
+
+            customer_email: req.user.email,
+          });
+
+          res.status(200).json({
+            url: session.url,
+          });
+        } catch (error) {
+          console.error("Create funding checkout session failed:", error);
+
+          res.status(500).json({
+            message: "Failed to create funding checkout session",
+          });
+        }
+      },
+    );
+
+    app.post("/fundings/verify-payment", verifyToken, async (req, res) => {
+      try {
+        const { sessionId } = req.body;
+
+        if (!sessionId) {
+          return res.status(400).json({
+            message: "Payment session ID is required",
+          });
+        }
+
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+        if (session.payment_status !== "paid") {
+          return res.status(400).json({
+            message: "Payment has not been completed",
+          });
+        }
+
+        if (session.metadata?.userId !== req.user.id) {
+          return res.status(403).json({
+            message: "You are not allowed to verify this payment",
+          });
+        }
+
+        const existingFunding = await fundingCollection.findOne({
+          stripeSessionId: session.id,
+        });
+
+        if (existingFunding) {
+          return res.status(200).json({
+            message: "Funding already recorded",
+            funding: existingFunding,
+          });
+        }
+
+        const funding = {
+          userId: session.metadata.userId,
+          userName: session.metadata.userName,
+          userEmail: session.metadata.userEmail,
+
+          amount: Number(session.metadata.amount),
+
+          paymentStatus: "paid",
+          stripeSessionId: session.id,
+
+          createdAt: new Date(),
+        };
+
+        const result = await fundingCollection.insertOne(funding);
+
+        res.status(201).json({
+          message: "Funding recorded successfully",
+          funding: {
+            _id: result.insertedId,
+            ...funding,
+          },
+        });
+      } catch (error) {
+        console.error("Verify funding payment failed:", error);
+
+        res.status(500).json({
+          message: "Failed to verify funding payment",
+        });
+      }
+    });
 
     app.get("/", (req, res) => {
       res.send("Blood Donation Server is running!");
