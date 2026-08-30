@@ -93,6 +93,22 @@ async function run() {
       requireRole("donor", "admin"),
       async (req, res) => {
         try {
+          const user = await userCollection.findOne({
+            _id: new ObjectId(req.user.id),
+          });
+
+          if (!user) {
+            return res.status(404).json({
+              message: "User not found",
+            });
+          }
+
+          if (user.status === "blocked") {
+            return res.status(403).json({
+              message:
+                "Your account is blocked. You cannot create donation requests.",
+            });
+          }
           const {
             recipientName,
             bloodGroup,
