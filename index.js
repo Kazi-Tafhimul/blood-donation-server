@@ -93,7 +93,7 @@ async function run() {
     app.post(
       "/donation-requests",
       verifyToken,
-      requireRole("donor", "admin"),
+      requireRole("donor", "admin", "volunteer"),
       async (req, res) => {
         try {
           const user = await userCollection.findOne({
