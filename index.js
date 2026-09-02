@@ -83,6 +83,7 @@ async function run() {
   try {
     console.log("Mongo URI protocol:", process.env.MONGODB_URI.split("://")[0]);
     console.log("Mongo URI length:", process.env.MONGODB_URI.length);
+    console.log("Mongo URI host:", new URL(process.env.MONGODB_URI).hostname);
     await client.connect();
     const db = client.db("blood-donation-db");
     const userCollection = db.collection("user");
