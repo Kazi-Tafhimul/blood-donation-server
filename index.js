@@ -85,15 +85,15 @@ async function run() {
     const mongoHost = new URL(process.env.MONGODB_URI).hostname;
 
     try {
-      const srvRecords = await dns.resolveSrv(`_mongodb._tcp.${mongoHost}`);
+  const addresses = await dns.lookup(mongoHost, { all: true });
 
-      console.log(
-        "Mongo SRV records:",
-        srvRecords.map((item) => `${item.name}:${item.port}`),
-      );
-    } catch (error) {
-      console.error("Mongo SRV lookup failed:", error.message);
-    }
+  console.log(
+    "Mongo host addresses:",
+    addresses.map((item) => `${item.address} (IPv${item.family})`)
+  );
+} catch (error) {
+  console.error("Mongo host lookup failed:", error.message);
+}
     await client.connect();
     const db = client.db("blood-donation-db");
     const userCollection = db.collection("user");
