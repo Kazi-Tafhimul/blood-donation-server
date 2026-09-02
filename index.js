@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const { createRemoteJWKSet, jwtVerify } = require("jose");
+const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
 const Stripe = require("stripe");
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -1241,17 +1241,16 @@ async function run() {
         });
       }
     });
-
-    app.get("/", (req, res) => {
-      res.send("Blood Donation Server is running!");
-    });
-
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
   } catch (error) {
     console.error("MongoDB connection failed:", error);
   }
 }
 
-run();
+run().catch(console.dir);
+app.get("/", (req, res) => {
+  res.send("Blood Donation Server is running!");
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
