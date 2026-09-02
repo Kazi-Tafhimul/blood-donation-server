@@ -81,6 +81,8 @@ const requireRole = (...allowedRoles) => {
 
 async function run() {
   try {
+    console.log("MONGODB_URI exists:", !!process.env.MONGODB_URI);
+    console.log("CLIENT_URL exists:", !!process.env.CLIENT_URL);
     await client.connect();
     const db = client.db("blood-donation-db");
     const userCollection = db.collection("user");
