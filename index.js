@@ -4,6 +4,7 @@ require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
 const Stripe = require("stripe");
+const dns = require("node:dns").promises;
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -81,9 +82,18 @@ const requireRole = (...allowedRoles) => {
 
 async function run() {
   try {
-    console.log("Mongo URI protocol:", process.env.MONGODB_URI.split("://")[0]);
-    console.log("Mongo URI length:", process.env.MONGODB_URI.length);
-    console.log("Mongo URI host:", new URL(process.env.MONGODB_URI).hostname);
+    const mongoHost = new URL(process.env.MONGODB_URI).hostname;
+
+    try {
+      const srvRecords = await dns.resolveSrv(`_mongodb._tcp.${mongoHost}`);
+
+      console.log(
+        "Mongo SRV records:",
+        srvRecords.map((item) => `${item.name}:${item.port}`),
+      );
+    } catch (error) {
+      console.error("Mongo SRV lookup failed:", error.message);
+    }
     await client.connect();
     const db = client.db("blood-donation-db");
     const userCollection = db.collection("user");
