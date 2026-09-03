@@ -1,3 +1,5 @@
+const dns = require("node:dns");
+dns.setServers(["1.1.1.1", "1.0.0.1"]);
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
@@ -13,8 +15,8 @@ const PORT = process.env.PORT || 5000;
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
     credentials: true,
+    origin: [process.env.CLIENT_URL],
   }),
 );
 
@@ -82,27 +84,24 @@ const requireRole = (...allowedRoles) => {
 
 async function run() {
   try {
-    const mongoHost = new URL(process.env.MONGODB_URI).hostname;
+    // const mongoHost = new URL(process.env.MONGODB_URI).hostname;
 
-    try {
-  const addresses = await dns.lookup(mongoHost, { all: true });
+    //     try {
+    //   const addresses = await dns.lookup(mongoHost, { all: true });
 
-  console.log(
-    "Mongo host addresses:",
-    addresses.map((item) => `${item.address} (IPv${item.family})`)
-  );
-} catch (error) {
-  console.error("Mongo host lookup failed:", error.message);
-}
+    //   // console.log(
+    //   //   "Mongo host addresses:",
+    //   //   addresses.map((item) => `${item.address} (IPv${item.family})`)
+    //   // );
+    // } catch (error) {
+    //   console.error("Mongo host lookup failed:", error.message);
+    // }
     await client.connect();
     const db = client.db("blood-donation-db");
     const userCollection = db.collection("user");
     const donationRequestCollection = db.collection("donationRequests");
     const fundingCollection = db.collection("fundings");
 
-    await client.db("admin").command({ ping: 1 });
-
-    console.log("MongoDB connected successfully!");
     app.post(
       "/donation-requests",
       verifyToken,
@@ -1254,6 +1253,9 @@ async function run() {
         });
       }
     });
+    //  await client.db("admin").command({ ping: 1 });
+
+    console.log("MongoDB connected successfully!");
   } catch (error) {
     console.error("MongoDB connection failed:", error);
   }
