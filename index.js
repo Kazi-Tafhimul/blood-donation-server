@@ -28,14 +28,9 @@ const client = new MongoClient(process.env.MONGODB_URI, {
     deprecationErrors: true,
   },
 });
-client
-  .connect()
-  .then(() => {
-    console.log("MongoDB connected successfully!");
-  })
-  .catch((error) => {
-    console.error("MongoDB connection failed:", error);
-  });
+client.connect().catch((error) => {
+  console.error("Initial MongoDB connection failed:", error);
+});
 const JWKS = createRemoteJWKSet(
   new URL(`${process.env.CLIENT_URL}/api/auth/jwks`),
 );
