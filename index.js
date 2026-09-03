@@ -6,7 +6,7 @@ require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
 const Stripe = require("stripe");
-const dns = require("node:dns").promises;
+
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
