@@ -7,7 +7,6 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
 const Stripe = require("stripe");
 
-
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
@@ -29,6 +28,14 @@ const client = new MongoClient(process.env.MONGODB_URI, {
     deprecationErrors: true,
   },
 });
+client
+  .connect()
+  .then(() => {
+    console.log("MongoDB connected successfully!");
+  })
+  .catch((error) => {
+    console.error("MongoDB connection failed:", error);
+  });
 const JWKS = createRemoteJWKSet(
   new URL(`${process.env.CLIENT_URL}/api/auth/jwks`),
 );
@@ -96,7 +103,7 @@ async function run() {
     // } catch (error) {
     //   console.error("Mongo host lookup failed:", error.message);
     // }
-    await client.connect();
+    // await client.connect();
     const db = client.db("blood-donation-db");
     const userCollection = db.collection("user");
     const donationRequestCollection = db.collection("donationRequests");
